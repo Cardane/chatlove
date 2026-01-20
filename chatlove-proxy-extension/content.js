@@ -12,7 +12,7 @@
 // Configuration
 const SIDEBAR_WIDTH = '380px';
 const ANIMATION_DURATION = '300ms';
-const PROXY_URL = 'http://127.0.0.1:8000/api/master-proxy';
+const PROXY_URL = 'http://209.38.79.211/api/master-proxy';
 const DEBUG = false;
 
 // Debug logger
@@ -680,7 +680,7 @@ function initializeSidebar() {
     
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/credits/total/${licenseKey}`
+        `http://209.38.79.211/api/credits/total/${licenseKey}`
       );
       
       if (response.ok) {
@@ -744,7 +744,7 @@ function initializeSidebar() {
     if (!licenseKey) return;
     
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/validate-license', {
+      const response = await fetch('http://209.38.79.211/api/validate-license', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ license_key: licenseKey })
@@ -823,7 +823,7 @@ function initializeSidebar() {
 
     // Verificar status da licença antes de enviar
     try {
-      const validateResponse = await fetch('http://127.0.0.1:8000/api/validate-license', {
+      const validateResponse = await fetch('http://209.38.79.211/api/validate-license', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ license_key: licenseKey })

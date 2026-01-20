@@ -40,17 +40,27 @@ app = FastAPI(
 )
 
 # CORS - Using Starlette's CORSMiddleware directly
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Detectar ambiente
+IS_PRODUCTION = os.getenv("ENVIRONMENT") == "production"
+
+if IS_PRODUCTION:
+    allowed_origins = [
+        "http://209.38.79.211",
+        "https://lovable.dev"
+    ]
+else:
+    allowed_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "http://209.38.79.211:3000",
-        "http://209.38.79.211:8000",
+        "http://209.38.79.211",
         "https://lovable.dev"
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
