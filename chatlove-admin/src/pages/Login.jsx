@@ -64,9 +64,6 @@ function Login({ onLogin }) {
           </button>
         </form>
 
-        <div className="login-footer">
-          <p>Credenciais padrão: admin / admin123</p>
-        </div>
       </div>
     </div>
   )

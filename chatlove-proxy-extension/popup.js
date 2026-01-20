@@ -38,8 +38,10 @@ activateBtn.addEventListener('click', async () => {
   showStatus('Validando licença...', 'info');
   
   try {
+    console.log('🔄 Validando licença:', licenseKey);
+    
     // Validate license with backend
-    const response = await fetch('https://209.38.79.211/api/validate-license', {
+    const response = await fetch('https://chat.trafficai.cloud/api/validate-license', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -49,36 +51,69 @@ activateBtn.addEventListener('click', async () => {
       })
     });
     
+    console.log('📡 Response status:', response.status);
+    
     if (!response.ok) {
-      showStatus('Erro ao conectar com o backend. Verifique se está rodando.', 'error');
+      showStatus('Erro ao conectar com o backend. Status: ' + response.status, 'error');
       return;
     }
     
     const data = await response.json();
+    console.log('📦 Response data:', data);
     
     if (data.success && data.valid) {
       // License is valid, save it
+      console.log('✅ Licença válida! Salvando...');
+      
       await chrome.storage.local.set({ 
         userName: userName,
-        licenseKey: licenseKey 
+        licenseKey: licenseKey,
+        certificateAccepted: true  // Marcar certificado como aceito
       });
-      showStatus('Licença ativada! Recarregando página...', 'success');
       
-      // Reload current tab to inject sidebar
+      console.log('💾 Licença salva no storage');
+      
+      showStatus('Licença ativada com sucesso! ✅', 'success');
+      
+      // Não recarregar automaticamente - deixar usuário decidir
       setTimeout(() => {
-        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-          if (tabs[0]) {
-            chrome.tabs.reload(tabs[0].id);
-          }
-        });
-      }, 1000);
+        showStatus('Licença ativa! Abra um projeto no Lovable para usar.', 'success');
+      }, 2000);
     } else {
       // Mostrar mensagem específica do backend
+      console.log('❌ Licença inválida:', data.message);
       showStatus(data.message || 'Licença inválida ou inativa.', 'error');
     }
   } catch (error) {
     console.error('Error validating license:', error);
-    showStatus('Erro: Backend não está rodando. Inicie: python main.py', 'error');
+    
+    // Detectar erro de certificado e abrir página de instruções
+    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+      // Verificar se já abriu instruções antes
+      chrome.storage.local.get(['certificateAccepted'], (result) => {
+        if (!result.certificateAccepted) {
+          // Primeira vez - abrir instruções
+          showStatus('Abrindo página de configuração...', 'info');
+          
+          chrome.tabs.create({ 
+            url: 'https://chat.trafficai.cloud',
+            active: true 
+          });
+          
+          // Marcar como aceito
+          chrome.storage.local.set({ certificateAccepted: true });
+          
+          setTimeout(() => {
+            showStatus('Siga as instruções na aba aberta e tente novamente.', 'info');
+          }, 2000);
+        } else {
+          // Já aceitou certificado - erro real
+          showStatus('Erro ao conectar: ' + error.message, 'error');
+        }
+      });
+    } else {
+      showStatus('Erro: Backend não está rodando. Inicie: python main.py', 'error');
+    }
   } finally {
     activateBtn.disabled = false;
   }
