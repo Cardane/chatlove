@@ -21,8 +21,13 @@ from auth import (
     generate_license_key, generate_hardware_id, verify_hardware_id,
     calculate_tokens_saved
 )
+from dotenv import load_dotenv
 
-# Lovable proxy removed - not needed for admin panel
+# Load environment variables
+load_dotenv()
+
+# Lovable API Configuration
+LOVABLE_API_URL = "https://api.lovable.dev"
 
 # =============================================================================
 # APP SETUP
@@ -95,6 +100,24 @@ class UserCreate(BaseModel):
 
 class LicenseCreate(BaseModel):
     user_id: Optional[int] = None
+    license_type: Optional[str] = "full"  # "trial" or "full"
+
+
+class MasterProxyRequest(BaseModel):
+    project_id: str
+    message: str
+    session_token: str
+    license_key: Optional[str] = None
+
+
+class MasterProxyResponse(BaseModel):
+    success: bool
+    message: str
+    credits_saved: bool = True
+
+
+class ValidateLicenseRequest(BaseModel):
+    license_key: str
 
 
 # =============================================================================
@@ -296,6 +319,9 @@ async def list_licenses(admin: Admin = Depends(get_current_admin), db: Session =
             "user_name": user.name if user else None,
             "is_active": lic.is_active,
             "is_used": lic.is_used,
+            "license_type": lic.license_type,
+            "expires_at": lic.expires_at.isoformat() if lic.expires_at else None,
+            "is_expired": lic.is_expired(),
             "created_at": lic.created_at.isoformat(),
             "activated_at": lic.activated_at.isoformat() if lic.activated_at else None,
             "tokens_saved": float(tokens)
@@ -311,7 +337,8 @@ async def create_license(license_data: LicenseCreate, admin: Admin = Depends(get
     
     license = License(
         license_key=license_key,
-        user_id=license_data.user_id
+        user_id=license_data.user_id,
+        license_type=license_data.license_type or "full"
     )
     db.add(license)
     db.commit()
@@ -322,7 +349,8 @@ async def create_license(license_data: LicenseCreate, admin: Admin = Depends(get
         "license": {
             "id": license.id,
             "license_key": license.license_key,
-            "user_id": license.user_id
+            "user_id": license.user_id,
+            "license_type": license.license_type
         }
     }
 
@@ -454,6 +482,138 @@ async def log_usage(message_length: int, license: License = Depends(get_current_
         "success": True,
         "tokens_saved": tokens_saved
     }
+
+
+# =============================================================================
+# VALIDATE LICENSE ENDPOINT (from proxy-backend)
+# =============================================================================
+
+@app.post("/api/validate-license")
+async def validate_license_simple(request: ValidateLicenseRequest, db: Session = Depends(get_db)):
+    """Valida se uma licença existe e está ativa (usado pelo popup)"""
+    license = db.query(License).filter(
+        License.license_key == request.license_key
+    ).first()
+    
+    if not license:
+        return {"success": False, "valid": False, "message": "Licença não encontrada"}
+    
+    if not license.is_active:
+        return {"success": False, "valid": False, "message": "Licença inativa"}
+    
+    # Verificar se licença trial expirou
+    if license.license_type == "trial" and license.expires_at:
+        if datetime.utcnow() > license.expires_at:
+            return {"success": False, "valid": False, "message": "Licença de teste expirada"}
+    
+    # Se é trial e ainda não foi ativada, definir expiração
+    if license.license_type == "trial" and not license.expires_at and license.is_used:
+        from datetime import timedelta
+        license.expires_at = datetime.utcnow() + timedelta(minutes=15)
+        db.commit()
+    
+    return {"success": True, "valid": True, "message": "Licença válida"}
+
+
+# =============================================================================
+# MASTER PROXY ENDPOINT
+# =============================================================================
+
+@app.post("/api/master-proxy", response_model=MasterProxyResponse)
+async def master_proxy(request: MasterProxyRequest, db: Session = Depends(get_db)):
+    """
+    Proxy para enviar mensagens ao Lovable usando session token do usuário
+    """
+    
+    # Validar dados
+    if not request.session_token:
+        raise HTTPException(status_code=400, detail="Session token não fornecido")
+    
+    if not request.project_id:
+        raise HTTPException(status_code=400, detail="Project ID não fornecido")
+    
+    if not request.message or not request.message.strip():
+        raise HTTPException(status_code=400, detail="Mensagem vazia")
+    
+    # Verificar se licença trial expirou
+    if request.license_key:
+        license = db.query(License).filter(
+            License.license_key == request.license_key
+        ).first()
+        
+        if license and license.license_type == "trial":
+            if license.expires_at and datetime.utcnow() > license.expires_at:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Licença de teste expirada. Adquira uma licença completa para continuar usando o ChatLove."
+                )
+    
+    # Preparar requisição para Lovable
+    lovable_url = f"{LOVABLE_API_URL}/projects/{request.project_id}/chat"
+    
+    headers = {
+        "Authorization": f"Bearer {request.session_token}",
+        "Content-Type": "application/json",
+        "User-Agent": "ChatLove/1.0"
+    }
+    
+    payload = {
+        "message": request.message,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                lovable_url,
+                headers=headers,
+                json=payload
+            )
+            
+            # 200 OK ou 202 Accepted = Sucesso
+            if response.status_code in [200, 202]:
+                # Registrar créditos
+                if request.license_key:
+                    tokens_saved = len(request.message) / 4
+                    
+                    try:
+                        license = db.query(License).filter(
+                            License.license_key == request.license_key
+                        ).first()
+                        
+                        if license:
+                            usage = UsageLog(
+                                license_id=license.id,
+                                tokens_saved=float(tokens_saved),
+                                message_length=len(request.message),
+                                request_count=1
+                            )
+                            db.add(usage)
+                            db.commit()
+                    except Exception as e:
+                        print(f"[MASTER PROXY] Erro ao registrar créditos: {e}")
+                
+                return MasterProxyResponse(
+                    success=True,
+                    message="Mensagem enviada com sucesso!",
+                    credits_saved=True
+                )
+            elif response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+            elif response.status_code == 403:
+                raise HTTPException(status_code=403, detail="Sem permissão neste projeto")
+            else:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Erro ao enviar para Lovable: {response.text}"
+                )
+                
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout ao conectar com Lovable API")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar requisição: {str(e)}")
 
 
 # =============================================================================

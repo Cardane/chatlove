@@ -56,6 +56,10 @@ class License(Base):
     is_active = Column(Boolean, default=True)
     is_used = Column(Boolean, default=False)  # Once used, cannot be reused
     
+    # License Type and Expiration
+    license_type = Column(String, default="full")  # "trial" or "full"
+    expires_at = Column(DateTime, nullable=True)   # Expiration date for trial licenses
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     activated_at = Column(DateTime, nullable=True)
@@ -63,6 +67,12 @@ class License(Base):
     # Relationships
     user = relationship("User", back_populates="licenses")
     usage_logs = relationship("UsageLog", back_populates="license")
+    
+    def is_expired(self):
+        """Check if license is expired"""
+        if self.expires_at:
+            return datetime.utcnow() > self.expires_at
+        return False
 
 
 class UsageLog(Base):

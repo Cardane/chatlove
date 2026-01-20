@@ -179,3 +179,15 @@
   color: rgba(255, 255, 255, 0.8);
   margin-bottom: 24px;
 }
+
+.status-badge.trial {
+  background: rgba(255, 152, 0, 0.2);
+  border: 1px solid rgba(255, 152, 0, 0.5);
+  color: #ffb74d;
+}
+
+.status-badge.expired {
+  background: rgba(244, 67, 54, 0.2);
+  border: 1px solid rgba(244, 67, 54, 0.5);
+  color: #ef5350;
+}

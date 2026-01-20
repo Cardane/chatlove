@@ -12,7 +12,7 @@
 // Configuration
 const SIDEBAR_WIDTH = '380px';
 const ANIMATION_DURATION = '300ms';
-const PROXY_URL = 'http://127.0.0.1:8002/api/master-proxy';
+const PROXY_URL = 'http://127.0.0.1:8000/api/master-proxy';
 
 // =============================================================================
 // COOKIE CAPTURE

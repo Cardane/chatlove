@@ -10,6 +10,7 @@ function Licenses() {
   const [showModal, setShowModal] = useState(false)
   const [copiedKey, setCopiedKey] = useState(null)
   const [selectedUserId, setSelectedUserId] = useState('')
+  const [licenseType, setLicenseType] = useState('full')
 
   useEffect(() => {
     loadLicenses()
@@ -38,10 +39,16 @@ function Licenses() {
 
   const handleCreateLicense = async () => {
     try {
-      const data = selectedUserId ? { user_id: parseInt(selectedUserId) } : {}
+      const data = {
+        license_type: licenseType
+      }
+      if (selectedUserId) {
+        data.user_id = parseInt(selectedUserId)
+      }
       await adminAPI.createLicense(data)
       setShowModal(false)
       setSelectedUserId('')
+      setLicenseType('full')
       loadLicenses()
     } catch (error) {
       alert('Erro ao criar licença: ' + (error.response?.data?.detail || error.message))
@@ -73,6 +80,26 @@ function Licenses() {
     navigator.clipboard.writeText(key)
     setCopiedKey(key)
     setTimeout(() => setCopiedKey(null), 2000)
+  }
+
+  const getTimeRemaining = (expiresAt) => {
+    if (!expiresAt) return null
+    
+    const now = new Date()
+    const expires = new Date(expiresAt)
+    const diff = expires - now
+    
+    if (diff <= 0) {
+      return 'Expirada'
+    }
+    
+    const minutes = Math.floor(diff / 60000)
+    const seconds = Math.floor((diff % 60000) / 1000)
+    
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s restantes`
+    }
+    return `${seconds}s restantes`
   }
 
   if (loading) {
@@ -128,10 +155,22 @@ function Licenses() {
             </div>
 
             <div>
-              <span className={`status-badge ${license.is_used ? 'used' : 'unused'} ${license.is_active ? 'active' : 'inactive'}`}>
-                {license.is_used ? 'Usada' : 'Disponível'}
-                {!license.is_active && ' (Inativa)'}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span className={`status-badge ${license.is_used ? 'used' : 'unused'} ${license.is_active ? 'active' : 'inactive'}`}>
+                  {license.is_used ? 'Usada' : 'Disponível'}
+                  {!license.is_active && ' (Inativa)'}
+                </span>
+                {license.license_type === 'trial' && (
+                  <span className={`status-badge ${license.is_expired ? 'expired' : 'trial'}`}>
+                    {license.is_expired ? '⏱️ Expirada' : '🧪 Trial'}
+                  </span>
+                )}
+                {license.license_type === 'trial' && license.expires_at && !license.is_expired && (
+                  <span style={{ fontSize: '11px', color: '#ff9800' }}>
+                    {getTimeRemaining(license.expires_at)}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="date-cell">
@@ -167,6 +206,17 @@ function Licenses() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Nova Licença</h2>
+            <div className="form-group">
+              <label>Tipo de Licença</label>
+              <select
+                value={licenseType}
+                onChange={(e) => setLicenseType(e.target.value)}
+              >
+                <option value="full">Licença Completa (sem expiração)</option>
+                <option value="trial">Licença de Teste (15 minutos)</option>
+              </select>
+            </div>
+            
             <div className="form-group">
               <label>Vincular a Usuário (opcional)</label>
               <select
