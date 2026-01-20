@@ -38,23 +38,46 @@ activateBtn.addEventListener('click', async () => {
   showStatus('Validando licença...', 'info');
   
   try {
-    // Save user name and license key
-    await chrome.storage.local.set({ 
-      userName: userName,
-      licenseKey: licenseKey 
+    // Validate license with backend
+    const response = await fetch('http://127.0.0.1:8001/api/validate-license', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        license_key: licenseKey
+      })
     });
     
-    // Test connection with backend
-    const response = await fetch('http://127.0.0.1:8001/health');
+    if (!response.ok) {
+      showStatus('Erro ao conectar com o backend. Verifique se está rodando.', 'error');
+      return;
+    }
     
-    if (response.ok) {
-      showStatus('✅ Licença ativada! Abra um projeto no Lovable.', 'success');
+    const data = await response.json();
+    
+    if (data.valid) {
+      // License is valid, save it
+      await chrome.storage.local.set({ 
+        userName: userName,
+        licenseKey: licenseKey 
+      });
+      showStatus('Licença ativada! Recarregando página...', 'success');
+      
+      // Reload current tab to inject sidebar
+      setTimeout(() => {
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+          if (tabs[0]) {
+            chrome.tabs.reload(tabs[0].id);
+          }
+        });
+      }, 1000);
     } else {
-      showStatus('⚠️ Licença salva, mas backend não está respondendo. Inicie o backend.', 'error');
+      showStatus('Licença inválida ou inativa.', 'error');
     }
   } catch (error) {
-    // Save anyway, backend might not be running yet
-    showStatus('⚠️ Licença salva, mas backend não está rodando. Inicie: python main.py', 'error');
+    console.error('Error validating license:', error);
+    showStatus('Erro: Backend não está rodando. Inicie: python main.py', 'error');
   } finally {
     activateBtn.disabled = false;
   }

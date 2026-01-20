@@ -13,83 +13,60 @@
 
     body {
       width: 350px;
-      min-height: 400px;
+      min-height: 300px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(180deg, #0f3460 0%, #16213e 100%);
+      background: #16213e;
       color: #fff;
-      padding: 20px;
+      padding: 24px;
     }
 
     .header {
       text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .logo {
-      font-size: 48px;
-      margin-bottom: 8px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
+      margin-bottom: 32px;
     }
 
     h1 {
       font-size: 24px;
-      background: linear-gradient(135deg, #E91E63, #9C27B0);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 8px;
-    }
-
-    .subtitle {
-      font-size: 14px;
-      opacity: 0.8;
+      color: #E91E63;
+      font-weight: 700;
+      margin-bottom: 4px;
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
-    }
-
-    .card-title {
-      font-size: 14px;
-      font-weight: 700;
-      margin-bottom: 12px;
-      color: #4CAF50;
+      padding: 20px;
     }
 
     .input-group {
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
 
     label {
       display: block;
-      font-size: 12px;
-      margin-bottom: 6px;
-      opacity: 0.8;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: rgba(255, 255, 255, 0.9);
     }
 
     input {
       width: 100%;
-      padding: 10px;
+      padding: 12px 16px;
       border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.2);
       background: rgba(255, 255, 255, 0.1);
       color: #fff;
       font-size: 14px;
+      transition: all 0.2s ease;
     }
 
     input:focus {
       outline: none;
-      border-color: #4CAF50;
-      box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+      border-color: #E91E63;
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 0 20px rgba(233, 30, 99, 0.3);
     }
 
     input::placeholder {
@@ -98,28 +75,26 @@
 
     button {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       border-radius: 8px;
       border: none;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s ease;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #4CAF50, #8BC34A);
+      background: #E91E63;
       color: white;
-      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+      box-shadow: 0 4px 15px rgba(233, 30, 99, 0.4);
+      margin-top: 8px;
     }
 
-    .btn-primary:hover {
+    button:hover:not(:disabled) {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+      box-shadow: 0 6px 20px rgba(233, 30, 99, 0.6);
     }
 
-    .btn-primary:disabled {
-      opacity: 0.5;
+    button:disabled {
+      opacity: 0.6;
       cursor: not-allowed;
       transform: none;
     }
@@ -128,8 +103,8 @@
       text-align: center;
       padding: 12px;
       border-radius: 8px;
-      font-size: 13px;
-      margin-top: 12px;
+      font-size: 14px;
+      margin-top: 16px;
     }
 
     .status.success {
@@ -143,53 +118,14 @@
       border: 1px solid rgba(244, 67, 54, 0.5);
       color: #f44336;
     }
-
-    .status.info {
-      background: rgba(33, 150, 243, 0.2);
-      border: 1px solid rgba(33, 150, 243, 0.5);
-      color: #2196F3;
-    }
-
-    .info-box {
-      background: rgba(76, 175, 80, 0.1);
-      border-left: 3px solid #4CAF50;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      line-height: 1.6;
-      margin-bottom: 16px;
-    }
-
-    .info-box strong {
-      color: #4CAF50;
-    }
-
-    .footer {
-      text-align: center;
-      font-size: 11px;
-      opacity: 0.6;
-      margin-top: 16px;
-    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="logo">♥</div>
-    <h1>ChatLove Proxy</h1>
-    <div class="subtitle">Economize 95% dos créditos</div>
-  </div>
-
-  <div class="info-box">
-    <strong>💡 Como funciona:</strong><br>
-    1. Ative sua licença abaixo<br>
-    2. Abra um projeto no Lovable<br>
-    3. Use a sidebar para enviar mensagens<br>
-    4. Preview atualiza sem consumir créditos<br>
-    5. Clique "enviar" no chat real para salvar
+    <h1>ChatLove</h1>
   </div>
 
   <div class="card">
-    <div class="card-title">Ativação de Licença</div>
     <div class="input-group">
       <label for="userName">Nome:</label>
       <input 
@@ -206,15 +142,10 @@
         placeholder="Digite sua chave de licença"
       >
     </div>
-    <button class="btn-primary" id="activateBtn">Ativar Licença</button>
+    <button id="activateBtn">Ativar Licença</button>
   </div>
 
   <div id="status" class="status" style="display: none;"></div>
-
-  <div class="footer">
-    ChatLove Proxy v1.0.0<br>
-    Backend deve estar rodando em http://127.0.0.1:8000
-  </div>
 
   <script src="popup.js"></script>
 </body>

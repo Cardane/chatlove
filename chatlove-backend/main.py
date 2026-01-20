@@ -457,6 +457,61 @@ async def log_usage(message_length: int, license: License = Depends(get_current_
 
 
 # =============================================================================
+# CREDITS ENDPOINTS
+# =============================================================================
+
+@app.post("/api/credits/log")
+async def log_credits(data: dict, db: Session = Depends(get_db)):
+    """Registra créditos economizados"""
+    license_key = data.get("license_key")
+    tokens_saved = data.get("tokens_saved", 0)
+    message_length = data.get("message_length", 0)
+    
+    if not license_key:
+        raise HTTPException(status_code=400, detail="License key não fornecida")
+    
+    # Buscar licença
+    license = db.query(License).filter(License.license_key == license_key).first()
+    
+    if not license:
+        raise HTTPException(status_code=404, detail="Licença não encontrada")
+    
+    # Criar registro de uso
+    usage = UsageLog(
+        license_id=license.id,
+        tokens_saved=float(tokens_saved),
+        message_length=int(message_length),
+        request_count=1
+    )
+    db.add(usage)
+    db.commit()
+    
+    return {"success": True, "tokens_saved": tokens_saved}
+
+
+@app.get("/api/credits/total/{license_key}")
+async def get_total_credits(license_key: str, db: Session = Depends(get_db)):
+    """Retorna total de créditos economizados por uma licença"""
+    license = db.query(License).filter(License.license_key == license_key).first()
+    
+    if not license:
+        raise HTTPException(status_code=404, detail="Licença não encontrada")
+    
+    # Somar todos os créditos
+    total = db.query(UsageLog).filter(
+        UsageLog.license_id == license.id
+    ).with_entities(
+        func.sum(UsageLog.tokens_saved)
+    ).scalar() or 0
+    
+    return {
+        "success": True,
+        "total_credits": float(total),
+        "license_key": license_key
+    }
+
+
+# =============================================================================
 # PROXY ENDPOINT
 # =============================================================================
 

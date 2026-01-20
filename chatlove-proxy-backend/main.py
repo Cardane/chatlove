@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 # Database path
-DB_PATH = "../chatlove.db"
+DB_PATH = "../chatlove-backend/chatlove.db"
 
 # Models
 class ProxyRequest(BaseModel):
@@ -185,6 +185,35 @@ async def get_proxy_history(project_id: str, license_key: str):
             status_code=500,
             detail=f"Erro ao buscar histórico: {str(e)}"
         )
+
+@app.post("/api/validate-license")
+async def validate_license_endpoint(request: dict):
+    """Valida se uma licença existe e está ativa"""
+    license_key = request.get("license_key")
+    
+    if not license_key:
+        return {"success": False, "valid": False, "message": "Chave de licença não fornecida"}
+    
+    is_valid = validate_license(license_key)
+    
+    if is_valid:
+        # Marcar licença como usada
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE licenses SET is_used = 1 WHERE license_key = ?",
+                (license_key,)
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Erro ao atualizar licença: {e}")
+        
+        return {"success": True, "valid": True, "message": "Licença válida"}
+    else:
+        return {"success": False, "valid": False, "message": "Licença inválida ou inativa"}
+
 
 @app.get("/health")
 async def health():

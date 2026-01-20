@@ -12,7 +12,35 @@
 // Configuration
 const SIDEBAR_WIDTH = '380px';
 const ANIMATION_DURATION = '300ms';
-const PROXY_URL = 'http://127.0.0.1:8001/api/lovable-proxy';
+const PROXY_URL = 'http://127.0.0.1:8002/api/master-proxy';
+
+// =============================================================================
+// COOKIE CAPTURE
+// =============================================================================
+
+async function getCookieToken() {
+  try {
+    // Content scripts não têm acesso direto a chrome.cookies
+    // Precisamos usar messaging para pedir ao background script
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: 'getCookie' },
+        (response) => {
+          if (response && response.cookie) {
+            console.log('[ChatLove Proxy] Cookie capturado com sucesso');
+            resolve(response.cookie);
+          } else {
+            console.error('[ChatLove Proxy] Cookie não encontrado');
+            resolve(null);
+          }
+        }
+      );
+    });
+  } catch (error) {
+    console.error('[ChatLove Proxy] Erro ao capturar cookie:', error);
+    return null;
+  }
+}
 
 // =============================================================================
 // INITIALIZATION
@@ -43,11 +71,12 @@ function injectSidebar() {
   const sidebar = document.createElement('div');
   sidebar.id = 'chatlove-sidebar';
   sidebar.innerHTML = `
-    <button class="cl-toggle-btn" id="cl-toggle-btn" title="Mostrar/Ocultar">♥</button>
+    <button class="cl-toggle-btn" id="cl-toggle-btn" title="Mostrar/Ocultar">
+      <span class="cl-toggle-text">Chat</span>
+    </button>
     
     <div class="cl-sidebar-header">
       <div class="cl-header-left">
-        <span class="cl-logo">♥</span>
         <span class="cl-title">ChatLove</span>
       </div>
       <button class="cl-close-btn" id="cl-close-btn" title="Minimizar">−</button>
@@ -68,7 +97,7 @@ function injectSidebar() {
 
       <div class="cl-chat-container" id="cl-chat-container">
         <div class="cl-message cl-bot">
-          ♥ Bem-vindo ao ChatLove! Seus créditos estão sendo economizados.
+          Bem-vindo ao ChatLove! Seus créditos estão sendo economizados.
         </div>
       </div>
 
@@ -130,18 +159,22 @@ function injectStyles() {
       top: 50%;
       right: 0;
       transform: translateY(-50%);
-      width: 50px;
-      height: 50px;
+      width: 40px;
+      height: 120px;
       background: linear-gradient(135deg, #E91E63, #9C27B0);
       border: none;
-      border-radius: 50% 0 0 50%;
+      border-radius: 8px 0 0 8px;
       color: white;
-      font-size: 24px;
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
       z-index: 999998;
       box-shadow: -3px 0 15px rgba(233, 30, 99, 0.5);
       transition: all 0.3s ease;
       display: none;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      padding: 10px 0;
     }
 
     #chatlove-sidebar.minimized .cl-toggle-btn {
@@ -153,6 +186,10 @@ function injectStyles() {
     .cl-toggle-btn:hover {
       transform: translateY(-50%) translateX(-5px);
       box-shadow: -5px 0 20px rgba(233, 30, 99, 0.7);
+    }
+
+    .cl-toggle-text {
+      letter-spacing: 2px;
     }
 
     .cl-sidebar-header {
@@ -386,8 +423,8 @@ function injectStyles() {
 
     #cl-message-input:focus {
       outline: none;
-      border-color: #4CAF50;
-      box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+      border-color: #E91E63;
+      box-shadow: 0 0 20px rgba(233, 30, 99, 0.3);
       background: rgba(255, 255, 255, 0.15);
     }
 
@@ -398,7 +435,7 @@ function injectStyles() {
     .cl-send-btn {
       width: 100%;
       padding: 12px;
-      background: linear-gradient(135deg, #4CAF50, #8BC34A);
+      background: #E91E63;
       border: none;
       border-radius: 10px;
       color: white;
@@ -406,12 +443,13 @@ function injectStyles() {
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s ease;
-      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+      box-shadow: 0 4px 15px rgba(233, 30, 99, 0.4);
     }
 
     .cl-send-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+      box-shadow: 0 6px 20px rgba(233, 30, 99, 0.6);
+      background: #C2185B;
     }
 
     .cl-send-btn:disabled {
@@ -506,15 +544,45 @@ function initializeSidebar() {
 
   // Clear button
   clearBtn.addEventListener('click', () => {
-    chatContainer.innerHTML = '<div class="cl-message cl-bot">♥ Histórico limpo!</div>';
+    chatContainer.innerHTML = '<div class="cl-message cl-bot">Histórico limpo!</div>';
     setStatus('Limpo');
   });
 
-  function detectProject() {
+  async function detectProject() {
     const match = window.location.pathname.match(/\/projects\/([a-f0-9-]+)/i);
     
     if (match) {
       const projectId = match[1];
+      
+      // Tentar buscar nome do projeto via API
+      try {
+        const sessionToken = await getCookieToken();
+        
+        if (sessionToken) {
+          const response = await fetch(
+            `https://api.lovable.dev/projects/${projectId}`,
+            {
+              headers: {
+                "Authorization": `Bearer ${sessionToken}`,
+                "Content-Type": "application/json"
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            const name = data.name || data.title || projectId;
+            projectName.textContent = name;
+            projectName.title = `${name} (${projectId})`;
+            console.log('[ChatLove Proxy] Projeto detectado:', name);
+            return projectId;
+          }
+        }
+      } catch (error) {
+        console.error('[ChatLove Proxy] Erro ao buscar nome do projeto:', error);
+      }
+      
+      // Fallback: mostrar ID abreviado
       projectName.textContent = projectId.substring(0, 8) + '...';
       projectName.title = projectId;
       console.log('[ChatLove Proxy] Projeto detectado:', projectId);
@@ -538,9 +606,27 @@ function initializeSidebar() {
   }
 
   async function loadStats() {
-    const stats = await chrome.storage.local.get(['chatlove_proxy_stats']);
-    if (stats.chatlove_proxy_stats) {
-      creditsSaved.textContent = stats.chatlove_proxy_stats.credits_saved || 0;
+    const { licenseKey } = await chrome.storage.local.get(['licenseKey']);
+    
+    if (!licenseKey) {
+      creditsSaved.textContent = '0';
+      return;
+    }
+    
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/credits/total/${licenseKey}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          creditsSaved.textContent = Math.floor(data.total_credits);
+        }
+      }
+    } catch (error) {
+      console.error('[ChatLove] Erro ao carregar créditos:', error);
+      creditsSaved.textContent = '0';
     }
   }
 
@@ -565,10 +651,21 @@ function initializeSidebar() {
       chatInput.dispatchEvent(new Event('input', { bubbles: true }));
       chatInput.dispatchEvent(new Event('change', { bubbles: true }));
       
-      // NÃO clicar no botão de envio!
-      // Deixar usuário clicar manualmente para salvar
+      // Aguardar um momento para o TipTap processar
+      setTimeout(() => {
+        // Encontrar botão de envio (último botão submit)
+        const allButtons = Array.from(document.querySelectorAll('button[type="submit"]'));
+        const sendButton = allButtons[allButtons.length - 1];
+        
+        if (sendButton) {
+          console.log('[ChatLove Proxy] Clicando no botão de envio...');
+          sendButton.click();
+          console.log('[ChatLove Proxy] Mensagem enviada! Preview vai atualizar.');
+        } else {
+          console.error('[ChatLove Proxy] Botão de envio não encontrado');
+        }
+      }, 300);
       
-      console.log('[ChatLove Proxy] Mensagem injetada (não enviada)');
       return true;
     } catch (error) {
       console.error('[ChatLove Proxy] Erro ao injetar:', error);
@@ -584,9 +681,9 @@ function initializeSidebar() {
       return;
     }
 
-    const projectId = detectProject();
+    const projectId = await detectProject();
     if (!projectId) {
-      addMessage('❌ Erro: Projeto não detectado', 'error');
+      addMessage('Erro: Projeto não detectado', 'error');
       setStatus('Erro');
       return;
     }
@@ -594,7 +691,17 @@ function initializeSidebar() {
     // Get license key
     const { licenseKey } = await chrome.storage.local.get(['licenseKey']);
     if (!licenseKey) {
-      addMessage('❌ Erro: Licença não ativada', 'error');
+      addMessage('Erro: Licença não ativada', 'error');
+      setStatus('Erro');
+      return;
+    }
+
+    // Capturar cookie automaticamente
+    setStatus('Capturando cookie...');
+    const sessionToken = await getCookieToken();
+    
+    if (!sessionToken) {
+      addMessage('Erro: Não foi possível capturar o cookie. Faça login no Lovable.', 'error');
       setStatus('Erro');
       return;
     }
@@ -606,7 +713,7 @@ function initializeSidebar() {
     setStatus('Enviando ao proxy...');
 
     try {
-      // Enviar para proxy
+      // Enviar para proxy com session_token
       const response = await fetch(PROXY_URL, {
         method: 'POST',
         headers: {
@@ -615,39 +722,32 @@ function initializeSidebar() {
         body: JSON.stringify({
           license_key: licenseKey,
           project_id: projectId,
-          message: message
+          message: message,
+          session_token: sessionToken  // ← Cookie capturado automaticamente
         })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        // Injetar no DOM do Lovable
-        const injected = injectMessageToLovable(message);
+        // Mensagem enviada com sucesso para o servidor
+        // O servidor já enviou para a API do Lovable
+        // NÃO precisamos injetar no DOM (evita duplicação)
         
-        if (injected) {
-          addMessage('✅ Mensagem enviada com sucesso!', 'success');
-          
-          // Atualizar estatísticas
-          const stats = await chrome.storage.local.get(['chatlove_proxy_stats']);
-          const currentStats = stats.chatlove_proxy_stats || { credits_saved: 0 };
-          currentStats.credits_saved += 1;
-          await chrome.storage.local.set({ chatlove_proxy_stats: currentStats });
-          
-          creditsSaved.textContent = currentStats.credits_saved;
-          setStatus('Enviado');
-        } else {
-          addMessage('❌ Erro ao enviar mensagem', 'error');
-          setStatus('Erro');
-        }
+        addMessage('Mensagem enviada com sucesso!', 'success');
+        
+        // Recarregar estatísticas do servidor
+        await loadStats();
+        
+        setStatus('Enviado');
       } else {
-        addMessage(`❌ Erro: ${data.message}`, 'error');
+        addMessage(`Erro: ${data.message}`, 'error');
         setStatus('Erro');
       }
 
     } catch (error) {
       console.error('[ChatLove Proxy] Erro:', error);
-      addMessage(`❌ Erro: ${error.message}`, 'error');
+      addMessage(`Erro: ${error.message}`, 'error');
       setStatus('Erro');
     } finally {
       sendBtn.disabled = false;
