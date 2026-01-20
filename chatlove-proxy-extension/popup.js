@@ -39,7 +39,7 @@ activateBtn.addEventListener('click', async () => {
   
   try {
     // Validate license with backend
-    const response = await fetch('http://209.38.79.211/api/validate-license', {
+    const response = await fetch('https://209.38.79.211/api/validate-license', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

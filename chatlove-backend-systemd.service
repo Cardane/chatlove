@@ -1,0 +1,16 @@
+[Unit]
+Description=ChatLove Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/chatlove/chatlove-backend
+Environment="ENVIRONMENT=production"
+Environment="PATH=/var/www/chatlove/chatlove-backend/venv/bin"
+ExecStart=/var/www/chatlove/chatlove-backend/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

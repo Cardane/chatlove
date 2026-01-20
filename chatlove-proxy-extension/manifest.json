@@ -17,7 +17,9 @@
   "host_permissions": [
     "https://lovable.dev/*",
     "https://*.lovable.dev/*",
-    "http://127.0.0.1:8000/*"
+    "http://127.0.0.1:8000/*",
+    "http://209.38.79.211/*",
+    "https://209.38.79.211/*"
   ],
   "background": {
     "service_worker": "background.js"
