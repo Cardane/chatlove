@@ -767,8 +767,9 @@ function initializeSidebar() {
       
       // Licença válida - verificar se é trial
       if (data.license_type === 'trial' && data.expires_at) {
+        // Backend retorna em UTC, precisamos converter corretamente
         const now = new Date();
-        const expires = new Date(data.expires_at);
+        const expires = new Date(data.expires_at + 'Z'); // Força interpretação como UTC
         const diff = expires - now;
         
         if (diff > 0) {
