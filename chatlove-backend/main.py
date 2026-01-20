@@ -516,16 +516,23 @@ async def validate_license_simple(request: ValidateLicenseRequest, db: Session =
     if not license.is_active:
         return {"success": False, "valid": False, "message": "Licença desativada pelo administrador"}
     
+    # MARCAR COMO USADA NA PRIMEIRA VALIDAÇÃO
+    if not license.is_used:
+        license.is_used = True
+        license.activated_at = datetime.utcnow()
+        
+        # Se for trial, definir expiração
+        if license.license_type == "trial":
+            from datetime import timedelta
+            license.expires_at = datetime.utcnow() + timedelta(minutes=15)
+        
+        db.commit()
+    
     # VERIFICAR SE É TRIAL E JÁ EXPIROU
     if license.license_type == "trial":
         if license.expires_at:
             if datetime.utcnow() > license.expires_at:
                 return {"success": False, "valid": False, "message": "Licença de teste expirada (15 minutos)"}
-        elif license.is_used:
-            # Trial ativada mas sem expiração definida - definir agora
-            from datetime import timedelta
-            license.expires_at = datetime.utcnow() + timedelta(minutes=15)
-            db.commit()
     
     # Retornar informações da licença para o frontend
     return {
