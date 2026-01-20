@@ -47,12 +47,13 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://lovable.dev",
-        "https://*.lovable.dev"
+        "http://209.38.79.211:3000",
+        "http://209.38.79.211:8000",
+        "https://lovable.dev"
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Security
@@ -498,21 +499,29 @@ async def validate_license_simple(request: ValidateLicenseRequest, db: Session =
     if not license:
         return {"success": False, "valid": False, "message": "Licença não encontrada"}
     
+    # VERIFICAR SE ESTÁ DESATIVADA
     if not license.is_active:
-        return {"success": False, "valid": False, "message": "Licença inativa"}
+        return {"success": False, "valid": False, "message": "Licença desativada pelo administrador"}
     
-    # Verificar se licença trial expirou
-    if license.license_type == "trial" and license.expires_at:
-        if datetime.utcnow() > license.expires_at:
-            return {"success": False, "valid": False, "message": "Licença de teste expirada"}
+    # VERIFICAR SE É TRIAL E JÁ EXPIROU
+    if license.license_type == "trial":
+        if license.expires_at:
+            if datetime.utcnow() > license.expires_at:
+                return {"success": False, "valid": False, "message": "Licença de teste expirada (15 minutos)"}
+        elif license.is_used:
+            # Trial ativada mas sem expiração definida - definir agora
+            from datetime import timedelta
+            license.expires_at = datetime.utcnow() + timedelta(minutes=15)
+            db.commit()
     
-    # Se é trial e ainda não foi ativada, definir expiração
-    if license.license_type == "trial" and not license.expires_at and license.is_used:
-        from datetime import timedelta
-        license.expires_at = datetime.utcnow() + timedelta(minutes=15)
-        db.commit()
-    
-    return {"success": True, "valid": True, "message": "Licença válida"}
+    # Retornar informações da licença para o frontend
+    return {
+        "success": True,
+        "valid": True,
+        "message": "Licença válida",
+        "license_type": license.license_type,
+        "expires_at": license.expires_at.isoformat() if license.expires_at else None
+    }
 
 
 # =============================================================================
@@ -535,17 +544,28 @@ async def master_proxy(request: MasterProxyRequest, db: Session = Depends(get_db
     if not request.message or not request.message.strip():
         raise HTTPException(status_code=400, detail="Mensagem vazia")
     
-    # Verificar se licença trial expirou
+    # VALIDAR LICENÇA ANTES DE ENVIAR
     if request.license_key:
         license = db.query(License).filter(
             License.license_key == request.license_key
         ).first()
         
-        if license and license.license_type == "trial":
+        if not license:
+            raise HTTPException(status_code=404, detail="Licença não encontrada")
+        
+        # Verificar se está desativada
+        if not license.is_active:
+            raise HTTPException(
+                status_code=403,
+                detail="Licença desativada pelo administrador. Entre em contato com o suporte."
+            )
+        
+        # Verificar se é trial e expirou
+        if license.license_type == "trial":
             if license.expires_at and datetime.utcnow() > license.expires_at:
                 raise HTTPException(
                     status_code=403,
-                    detail="Licença de teste expirada. Adquira uma licença completa para continuar usando o ChatLove."
+                    detail="Licença de teste expirada (15 minutos). Adquira uma licença completa para continuar."
                 )
     
     # Preparar requisição para Lovable

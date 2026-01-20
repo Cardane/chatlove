@@ -56,7 +56,7 @@ activateBtn.addEventListener('click', async () => {
     
     const data = await response.json();
     
-    if (data.valid) {
+    if (data.success && data.valid) {
       // License is valid, save it
       await chrome.storage.local.set({ 
         userName: userName,
@@ -73,7 +73,8 @@ activateBtn.addEventListener('click', async () => {
         });
       }, 1000);
     } else {
-      showStatus('Licença inválida ou inativa.', 'error');
+      // Mostrar mensagem específica do backend
+      showStatus(data.message || 'Licença inválida ou inativa.', 'error');
     }
   } catch (error) {
     console.error('Error validating license:', error);

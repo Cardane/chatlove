@@ -13,6 +13,12 @@
 const SIDEBAR_WIDTH = '380px';
 const ANIMATION_DURATION = '300ms';
 const PROXY_URL = 'http://127.0.0.1:8000/api/master-proxy';
+const DEBUG = false;
+
+// Debug logger
+function log(...args) {
+  if (DEBUG) console.log(...args);
+}
 
 // =============================================================================
 // COOKIE CAPTURE
@@ -92,6 +98,14 @@ function injectSidebar() {
         <div class="cl-stat">
           <div class="cl-stat-label">Créditos Economizados</div>
           <div class="cl-stat-value" id="cl-credits-saved">0</div>
+        </div>
+      </div>
+
+      <div class="cl-trial-warning" id="cl-trial-warning" style="display: none;">
+        <div class="cl-trial-icon">⏱️</div>
+        <div class="cl-trial-text">
+          <div class="cl-trial-title">Licença de Teste</div>
+          <div class="cl-trial-time" id="cl-trial-time">Carregando...</div>
         </div>
       </div>
 
@@ -325,6 +339,53 @@ function injectStyles() {
       opacity: 0.9;
     }
 
+    .cl-trial-warning {
+      padding: 12px 16px;
+      background: rgba(255, 152, 0, 0.15);
+      border-bottom: 1px solid rgba(255, 152, 0, 0.3);
+      border-left: 3px solid #FF9800;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: pulse-warning 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-warning {
+      0%, 100% {
+        background: rgba(255, 152, 0, 0.15);
+      }
+      50% {
+        background: rgba(255, 152, 0, 0.25);
+      }
+    }
+
+    .cl-trial-icon {
+      font-size: 24px;
+      animation: rotate 3s linear infinite;
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .cl-trial-text {
+      flex: 1;
+    }
+
+    .cl-trial-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #FF9800;
+      margin-bottom: 4px;
+    }
+
+    .cl-trial-time {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+
     .cl-chat-container {
       flex: 1;
       overflow-y: auto;
@@ -515,8 +576,12 @@ function initializeSidebar() {
   // Detect project
   detectProject();
 
-  // Load stats
+  // Load stats and check license status
   loadStats();
+  checkLicenseStatus();
+  
+  // Check license status every 10 seconds
+  setInterval(checkLicenseStatus, 10000);
 
   // Toggle button
   const toggleBtn = document.getElementById('cl-toggle-btn');
@@ -673,6 +738,66 @@ function initializeSidebar() {
     }
   }
 
+  async function checkLicenseStatus() {
+    const { licenseKey } = await chrome.storage.local.get(['licenseKey']);
+    
+    if (!licenseKey) return;
+    
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/validate-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_key: licenseKey })
+      });
+      
+      const data = await response.json();
+      
+      const trialWarning = document.getElementById('cl-trial-warning');
+      const trialTime = document.getElementById('cl-trial-time');
+      const sendBtn = document.getElementById('cl-send-btn');
+      
+      if (!data.success || !data.valid) {
+        // Licença inválida/desativada/expirada
+        trialWarning.style.display = 'flex';
+        trialTime.textContent = data.message || 'Licença bloqueada';
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Bloqueado';
+        return;
+      }
+      
+      // Licença válida - verificar se é trial
+      if (data.license_type === 'trial' && data.expires_at) {
+        const now = new Date();
+        const expires = new Date(data.expires_at);
+        const diff = expires - now;
+        
+        if (diff > 0) {
+          // Trial ativa - mostrar contador
+          const minutes = Math.floor(diff / 60000);
+          const seconds = Math.floor((diff % 60000) / 1000);
+          
+          trialWarning.style.display = 'flex';
+          trialTime.textContent = `${minutes}m ${seconds}s restantes`;
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Enviar';
+        } else {
+          // Trial expirada
+          trialWarning.style.display = 'flex';
+          trialTime.textContent = 'Licença expirada';
+          sendBtn.disabled = true;
+          sendBtn.textContent = 'Bloqueado';
+        }
+      } else {
+        // Licença full - esconder aviso
+        trialWarning.style.display = 'none';
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Enviar';
+      }
+    } catch (error) {
+      console.error('[ChatLove] Erro ao verificar licença:', error);
+    }
+  }
+
   async function sendMessage() {
     const message = messageInput.value.trim();
     
@@ -694,6 +819,26 @@ function initializeSidebar() {
       addMessage('Erro: Licença não ativada', 'error');
       setStatus('Erro');
       return;
+    }
+
+    // Verificar status da licença antes de enviar
+    try {
+      const validateResponse = await fetch('http://127.0.0.1:8000/api/validate-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ license_key: licenseKey })
+      });
+      
+      const validateData = await validateResponse.json();
+      
+      if (!validateData.success || !validateData.valid) {
+        addMessage(`Erro: ${validateData.message}`, 'error');
+        setStatus('Bloqueado');
+        sendBtn.disabled = true;
+        return;
+      }
+    } catch (error) {
+      console.error('[ChatLove] Erro ao validar licença:', error);
     }
 
     // Capturar cookie automaticamente
@@ -727,6 +872,15 @@ function initializeSidebar() {
         })
       });
 
+      if (!response.ok) {
+        // Erro HTTP (403, 404, etc)
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || errorData.message || 'Erro ao enviar mensagem';
+        addMessage(`Erro: ${errorMessage}`, 'error');
+        setStatus('Erro');
+        return;
+      }
+
       const data = await response.json();
 
       if (data.success) {
@@ -741,7 +895,8 @@ function initializeSidebar() {
         
         setStatus('Enviado');
       } else {
-        addMessage(`Erro: ${data.message}`, 'error');
+        const errorMessage = data.message || data.detail || 'Erro desconhecido';
+        addMessage(`Erro: ${errorMessage}`, 'error');
         setStatus('Erro');
       }
 
