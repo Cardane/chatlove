@@ -46,6 +46,7 @@ IS_PRODUCTION = os.getenv("ENVIRONMENT") == "production"
 if IS_PRODUCTION:
     allowed_origins = [
         "http://209.38.79.211",
+        "https://209.38.79.211",
         "https://lovable.dev"
     ]
 else:
@@ -55,6 +56,7 @@ else:
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://209.38.79.211",
+        "https://209.38.79.211",
         "https://lovable.dev"
     ]
 
