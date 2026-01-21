@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(180deg, #0f3460 0%, #16213e 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,141 +22,171 @@
         }
 
         .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 600px;
+            background: #1a1f35;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            max-width: 700px;
             width: 100%;
             padding: 40px;
+        }
+
+        .header {
             text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .logo {
-            font-size: 48px;
-            margin-bottom: 10px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #E91E63, #9C27B0);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 20px;
         }
 
         h1 {
-            font-size: 32px;
-            color: #333;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, #E91E63, #9C27B0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .subtitle {
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 30px;
-        }
-
-        .success-message {
-            background: linear-gradient(135deg, #4CAF50, #8BC34A);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            font-size: 18px;
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 8px;
             font-weight: 600;
         }
 
-        .success-icon {
-            font-size: 48px;
-            margin-bottom: 10px;
+        .subtitle {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
         }
 
-        .instructions {
-            text-align: left;
-            background: #f5f5f5;
+        .status-box {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-left: 3px solid #4CAF50;
             padding: 20px;
-            border-radius: 12px;
+            border-radius: 8px;
             margin-bottom: 30px;
         }
 
-        .instructions h2 {
-            font-size: 20px;
-            color: #333;
-            margin-bottom: 15px;
+        .status-title {
+            color: #4CAF50;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .status-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .instructions {
+            margin-bottom: 30px;
+        }
+
+        .instructions-title {
+            font-size: 18px;
+            color: #fff;
+            margin-bottom: 20px;
+            font-weight: 600;
         }
 
         .step {
             display: flex;
             align-items: start;
-            margin-bottom: 15px;
-            padding: 12px;
-            background: white;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .step:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(233, 30, 99, 0.3);
         }
 
         .step-number {
             background: linear-gradient(135deg, #E91E63, #9C27B0);
             color: white;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            margin-right: 15px;
+            font-weight: 600;
+            font-size: 14px;
+            margin-right: 16px;
             flex-shrink: 0;
         }
 
         .step-text {
             flex: 1;
-            color: #333;
+            color: rgba(255, 255, 255, 0.9);
             line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .step-text strong {
+            color: #fff;
+            font-weight: 600;
         }
 
         .buttons {
             display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 30px;
         }
 
         .btn {
             flex: 1;
-            min-width: 200px;
-            padding: 15px 30px;
+            padding: 14px 24px;
             border: none;
-            border-radius: 10px;
-            font-size: 16px;
+            border-radius: 8px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             text-decoration: none;
-            display: inline-block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .btn-primary {
             background: linear-gradient(135deg, #E91E63, #9C27B0);
             color: white;
-            box-shadow: 0 4px 15px rgba(233, 30, 99, 0.4);
+            box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(233, 30, 99, 0.6);
+            box-shadow: 0 6px 16px rgba(233, 30, 99, 0.4);
         }
 
         .btn-secondary {
-            background: #f5f5f5;
-            color: #333;
-            border: 2px solid #ddd;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .btn-secondary:hover {
-            background: #e0e0e0;
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .footer {
-            margin-top: 30px;
             padding-top: 20px;
-            border-top: 1px solid #eee;
-            color: #999;
-            font-size: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
+            text-align: center;
         }
 
         @media (max-width: 600px) {
@@ -171,78 +201,60 @@
             .buttons {
                 flex-direction: column;
             }
-
-            .btn {
-                width: 100%;
-            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo">♥️</div>
-        <h1>ChatLove</h1>
-        <p class="subtitle">Economize créditos no Lovable.dev</p>
+        <div class="header">
+            <div class="logo">♥</div>
+            <h1>ChatLove</h1>
+            <p class="subtitle">Sistema de Economia de Créditos</p>
+        </div>
 
-        <div class="success-message">
-            <div class="success-icon">✅</div>
-            <div>Certificado Aceito com Sucesso!</div>
+        <div class="status-box">
+            <div class="status-title">Certificado SSL Aceito</div>
+            <div class="status-text">
+                A conexão segura foi estabelecida com sucesso. Você pode prosseguir com a ativação da licença.
+            </div>
         </div>
 
         <div class="instructions">
-            <h2>📋 Próximos Passos:</h2>
+            <div class="instructions-title">Próximos Passos</div>
             
             <div class="step">
                 <div class="step-number">1</div>
                 <div class="step-text">
-                    <strong>Feche esta aba</strong> e volte para a extension
+                    <strong>Feche esta aba</strong> e retorne para o popup da extension
                 </div>
             </div>
 
             <div class="step">
                 <div class="step-number">2</div>
                 <div class="step-text">
-                    <strong>Digite seu nome e chave de licença</strong> no popup da extension
+                    <strong>Insira suas credenciais</strong> (nome e chave de licença) no formulário
                 </div>
             </div>
 
             <div class="step">
                 <div class="step-number">3</div>
                 <div class="step-text">
-                    <strong>Clique em "Ativar Licença"</strong> - agora vai funcionar!
+                    <strong>Clique em "Ativar Licença"</strong> para validar e ativar o sistema
                 </div>
             </div>
 
             <div class="step">
                 <div class="step-number">4</div>
                 <div class="step-text">
-                    <strong>Abra um projeto no Lovable.dev</strong> e comece a economizar créditos
+                    <strong>Acesse um projeto no Lovable.dev</strong> para começar a economizar créditos
                 </div>
             </div>
         </div>
 
-        <div class="buttons">
-            <a href="/admin" class="btn btn-secondary">
-                🔧 Painel Admin
-            </a>
-            <button class="btn btn-primary" onclick="window.close()">
-                ✨ Fechar e Usar Extension
-            </button>
-        </div>
 
         <div class="footer">
-            ChatLove v1.0 - Economize até 95% dos seus créditos
+            ChatLove v1.0 - Sistema de Gerenciamento de Créditos
         </div>
     </div>
-
-    <script>
-        // Auto-close após 10 segundos (opcional)
-        setTimeout(() => {
-            const autoClose = confirm('Certificado aceito! Fechar esta aba automaticamente?');
-            if (autoClose) {
-                window.close();
-            }
-        }, 10000);
-    </script>
 </body>
 </html>
