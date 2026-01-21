@@ -210,7 +210,8 @@ async def admin_login(login: AdminLogin, db: Session = Depends(get_db)):
         "token": token,
         "admin": {
             "id": admin.id,
-            "username": admin.username
+            "username": admin.username,
+            "role": admin.role
         }
     }
 

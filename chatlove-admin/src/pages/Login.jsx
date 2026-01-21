@@ -15,8 +15,8 @@ function Login({ onLogin }) {
 
     try {
       const response = await adminAPI.login(username, password)
-      const { token } = response.data
-      onLogin(token)
+      const { token, admin } = response.data
+      onLogin(token, admin.role)
     } catch (err) {
       setError(err.response?.data?.detail || 'Erro ao fazer login')
     } finally {

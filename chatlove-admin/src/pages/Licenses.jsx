@@ -11,6 +11,7 @@ function Licenses() {
   const [copiedKey, setCopiedKey] = useState(null)
   const [selectedUserId, setSelectedUserId] = useState('')
   const [licenseType, setLicenseType] = useState('full')
+  const adminRole = localStorage.getItem('admin_role')
 
   useEffect(() => {
     loadLicenses()
@@ -190,13 +191,15 @@ function Licenses() {
               >
                 {license.is_active ? 'Desativar' : 'Ativar'}
               </button>
-              <button
-                className="delete-btn"
-                onClick={() => handleDeleteLicense(license.id, license.license_key)}
-                title="Deletar licença"
-              >
-                <Trash2 size={16} />
-              </button>
+              {adminRole === 'master' && (
+                <button
+                  className="delete-btn"
+                  onClick={() => handleDeleteLicense(license.id, license.license_key)}
+                  title="Deletar licença"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
           </div>
         ))}

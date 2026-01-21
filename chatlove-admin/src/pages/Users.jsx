@@ -9,6 +9,7 @@ function Users() {
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [newUser, setNewUser] = useState({ name: '', email: '' })
+  const adminRole = localStorage.getItem('admin_role')
 
   useEffect(() => {
     loadUsers()
@@ -114,10 +115,12 @@ function Users() {
                 <Edit size={16} />
                 Editar
               </button>
-              <button className="btn-delete" onClick={() => handleDeleteUser(user.id, user.name)}>
-                <Trash2 size={16} />
-                Deletar
-              </button>
+              {adminRole === 'master' && (
+                <button className="btn-delete" onClick={() => handleDeleteUser(user.id, user.name)}>
+                  <Trash2 size={16} />
+                  Deletar
+                </button>
+              )}
             </div>
           </div>
         ))}

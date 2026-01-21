@@ -27,6 +27,7 @@ class Admin(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     password_hash = Column(String)
+    role = Column(String, default="viewer")  # "master" or "viewer"
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
