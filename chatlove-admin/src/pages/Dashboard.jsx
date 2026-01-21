@@ -6,6 +6,7 @@ import './Dashboard.css'
 function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const adminRole = localStorage.getItem('admin_role')
 
   useEffect(() => {
     loadStats()
@@ -76,16 +77,18 @@ function Dashboard() {
         <h2>Bem-vindo ao ChatLove Admin</h2>
         <p>Gerencie usuários, licenças e acompanhe o uso do sistema.</p>
         
-        <div className="quick-actions">
-          <a href="/users" className="action-btn">
-            <Users size={20} />
-            <span>Gerenciar Usuários</span>
-          </a>
-          <a href="/licenses" className="action-btn">
-            <Key size={20} />
-            <span>Gerenciar Licenças</span>
-          </a>
-        </div>
+        {adminRole === 'master' && (
+          <div className="quick-actions">
+            <a href="/users" className="action-btn">
+              <Users size={20} />
+              <span>Gerenciar Usuários</span>
+            </a>
+            <a href="/licenses" className="action-btn">
+              <Key size={20} />
+              <span>Gerenciar Licenças</span>
+            </a>
+          </div>
+        )}
       </div>
     </div>
   )

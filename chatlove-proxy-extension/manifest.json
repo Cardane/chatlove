@@ -19,7 +19,8 @@
     "https://*.lovable.dev/*",
     "http://127.0.0.1:8000/*",
     "http://209.38.79.211/*",
-    "https://209.38.79.211/*"
+    "https://209.38.79.211/*",
+    "https://chat.trafficai.cloud/*"
   ],
   "background": {
     "service_worker": "background.js"
