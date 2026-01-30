@@ -1,0 +1,24 @@
+{
+  "name": "lovable-scraper",
+  "version": "1.0.0",
+  "description": "Script automatizado para capturar e analisar API do Lovable",
+  "main": "lovable-scraper.js",
+  "scripts": {
+    "scrape": "node lovable-scraper.js",
+    "analyze": "node analyze-capture.js",
+    "stream-analyze": "node stream-analyzer.js",
+    "start": "node lovable-scraper.js"
+  },
+  "keywords": [
+    "lovable",
+    "scraper",
+    "api",
+    "puppeteer"
+  ],
+  "author": "ChatLove Team",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^21.7.0",
+    "chalk": "^4.1.2"
+  }
+}

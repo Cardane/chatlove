@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, Key, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, Key, LogOut, Server } from 'lucide-react'
 import './Layout.css'
 
 function Layout({ children, onLogout }) {
@@ -38,6 +38,14 @@ function Layout({ children, onLogout }) {
           >
             <Key size={20} />
             <span>Licenças</span>
+          </Link>
+
+          <Link
+            to="/hub-accounts"
+            className={`nav-item ${isActive('/hub-accounts') ? 'active' : ''}`}
+          >
+            <Server size={20} />
+            <span>Contas Hub</span>
           </Link>
         </nav>
 

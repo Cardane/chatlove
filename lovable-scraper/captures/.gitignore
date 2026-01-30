@@ -1,0 +1,6 @@
+# Ignorar todos os arquivos de captura (contêm dados sensíveis)
+*.json
+*.md
+
+# Manter apenas este .gitignore
+!.gitignore

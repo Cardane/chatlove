@@ -50,7 +50,14 @@ export const adminAPI = {
   createLicense: (data) => api.post('/api/admin/licenses', data),
   updateLicense: (id, isActive) =>
     api.put(`/api/admin/licenses/${id}?is_active=${isActive}`),
-  deleteLicense: (id) => api.delete(`/api/admin/licenses/${id}`)
+  deleteLicense: (id) => api.delete(`/api/admin/licenses/${id}`),
+
+  // Hub Accounts
+  getHubAccounts: () => api.get('/api/admin/hub-accounts'),
+  createHubAccount: (data) => api.post('/api/admin/hub-accounts', data),
+  updateHubAccount: (id, data) => api.put(`/api/admin/hub-accounts/${id}`, data),
+  deleteHubAccount: (id) => api.delete(`/api/admin/hub-accounts/${id}`),
+  getHubProjects: (id) => api.get(`/api/admin/hub-accounts/${id}/projects`)
 }
 
 export default api

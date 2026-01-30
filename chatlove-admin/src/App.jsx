@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
 import Licenses from './pages/Licenses'
+import HubAccounts from './pages/HubAccounts'
 import Layout from './components/Layout'
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/users" element={<Users />} />
           <Route path="/licenses" element={<Licenses />} />
+          <Route path="/hub-accounts" element={<HubAccounts />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Layout>

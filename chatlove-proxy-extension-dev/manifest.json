@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "ChatLove DEV",
+  "version": "2.0.0",
+  "description": "Versão de desenvolvimento com Plan/Builder mode e interceptação",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "cookies",
+    "storage",
+    "tabs",
+    "webRequest",
+    "webRequestBlocking"
+  ],
+  "host_permissions": [
+    "https://lovable.dev/*",
+    "https://*.lovable.dev/*",
+    "https://api.lovable.dev/*",
+    "http://127.0.0.1:8000/*",
+    "http://209.38.79.211/*",
+    "https://209.38.79.211/*",
+    "https://chat.trafficai.cloud/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://lovable.dev/projects/*"],
+      "js": ["content-no-interceptor.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}

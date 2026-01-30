@@ -17,11 +17,11 @@
 ## 🖥️ Configurações do Servidor VPS
 ### Dados de Acesso
 - **IP:** 209.38.79.211
-- **Usuário SSH:** alan
+- **Usuário SSH:** root
 - **Chave SSH:** `C:\Users\Alan Cardane\.ssh\id_ed25519`
 - **Diretório do Projeto:** `/var/www/chatlove`
 
 ### Comandos SSH Essenciais
 ```powershell
 # Acesso SSH
-ssh -i "C:\Users\Alan Cardane\.ssh\id_ed25519" alan@209.38.79.211
+ssh -i "C:\Users\Alan Cardane\.ssh\id_ed25519" root@209.38.79.211

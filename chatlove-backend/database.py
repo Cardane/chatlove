@@ -76,12 +76,68 @@ class License(Base):
         return False
 
 
+class HubAccount(Base):
+    """Conta do hub com créditos para proxy"""
+    __tablename__ = "hub_accounts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)                # Nome amigável (ex: "Hub Account 1")
+    email = Column(String, unique=True, index=True)  # Email da conta Lovable
+    session_token = Column(String)                   # Token Bearer do Lovable
+    credits_remaining = Column(Float, default=0.0)   # Créditos estimados restantes
+    is_active = Column(Boolean, default=True)        # Se está disponível para uso
+    priority = Column(Integer, default=0)            # 0 = maior prioridade (para futuro)
+    
+    # Estatísticas
+    total_requests = Column(Integer, default=0)      # Total de requisições
+    last_used_at = Column(DateTime, nullable=True)   # Última vez usada
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    project_mappings = relationship("ProjectMapping", back_populates="hub_account")
+    usage_logs = relationship("UsageLog", back_populates="hub_account", foreign_keys="UsageLog.hub_account_id")
+
+
+class ProjectMapping(Base):
+    """Mapeia projetos originais para projetos equivalentes no hub"""
+    __tablename__ = "project_mappings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # IDs dos projetos
+    original_project_id = Column(String, index=True)   # Projeto da conta do usuário
+    hub_project_id = Column(String, index=True)        # Projeto criado na conta hub
+    
+    # Relacionamento
+    hub_account_id = Column(Integer, ForeignKey("hub_accounts.id"))
+    
+    # Metadados
+    project_name = Column(String, nullable=True)       # Nome do projeto (cache)
+    sync_enabled = Column(Boolean, default=False)      # Se sincronização está ativa
+    last_synced_at = Column(DateTime, nullable=True)   # Última sincronização
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    hub_account = relationship("HubAccount", back_populates="project_mappings")
+
+
 class UsageLog(Base):
     """Track usage and tokens saved"""
     __tablename__ = "usage_logs"
     
     id = Column(Integer, primary_key=True, index=True)
     license_id = Column(Integer, ForeignKey("licenses.id"))
+    
+    # ===== CAMPOS ADICIONADOS PARA HUB =====
+    hub_account_id = Column(Integer, ForeignKey("hub_accounts.id"), nullable=True)
+    original_project_id = Column(String, nullable=True)  # Projeto do usuário
+    hub_project_id = Column(String, nullable=True)       # Projeto usado no hub
+    # =======================================
     
     # Usage data
     tokens_saved = Column(Float, default=0.0)
@@ -93,6 +149,7 @@ class UsageLog(Base):
     
     # Relationships
     license = relationship("License", back_populates="usage_logs")
+    hub_account = relationship("HubAccount", back_populates="usage_logs", foreign_keys=[hub_account_id])
 
 
 # =============================================================================

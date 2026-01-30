@@ -15,7 +15,7 @@ import uvicorn
 import os
 import httpx
 
-from database import get_db, init_db, create_default_admin, User, License, UsageLog, Admin
+from database import get_db, init_db, create_default_admin, User, License, UsageLog, Admin, HubAccount, ProjectMapping
 from auth import (
     verify_password, get_password_hash, create_access_token, verify_token,
     generate_license_key, generate_hardware_id, verify_hardware_id,
@@ -62,7 +62,7 @@ else:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["https://lovable.dev"],  # ← CORREÇÃO: Apenas um valor
     allow_origin_regex=r"chrome-extension://.*",  # Permitir todas extensions do Chrome
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -134,6 +134,29 @@ class ValidateLicenseRequest(BaseModel):
     license_key: str
 
 
+class HubAccountCreate(BaseModel):
+    name: str
+    email: str
+    session_token: str
+    credits_remaining: float = 0.0
+    priority: int = 0
+
+
+class HubAccountUpdate(BaseModel):
+    name: Optional[str] = None
+    session_token: Optional[str] = None
+    credits_remaining: Optional[float] = None
+    is_active: Optional[bool] = None
+    priority: Optional[int] = None
+
+
+class ProxyHubRequest(BaseModel):
+    license_key: str
+    original_project_id: str   # Projeto da conta do usuário
+    message: str
+    user_session_token: str    # Token da conta do usuário (para futura validação)
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
@@ -166,6 +189,130 @@ def get_current_license(credentials: HTTPAuthorizationCredentials = Depends(secu
         raise HTTPException(status_code=401, detail="License not found or inactive")
     
     return license
+
+
+# =============================================================================
+# HUB HELPER FUNCTIONS
+# =============================================================================
+
+def get_active_hub_account(db: Session) -> HubAccount:
+    """
+    Retorna primeira conta hub ativa
+    (Versão simplificada - sem rotação)
+    """
+    account = db.query(HubAccount).filter(
+        HubAccount.is_active == True
+    ).order_by(
+        HubAccount.priority.asc()
+    ).first()
+    
+    if not account:
+        raise HTTPException(
+            status_code=503,
+            detail="Nenhuma conta hub disponível. Configure uma conta no admin panel."
+        )
+    
+    # Atualizar estatísticas
+    account.last_used_at = datetime.utcnow()
+    account.total_requests += 1
+    db.commit()
+    
+    return account
+
+
+async def get_or_create_hub_project(
+    original_project_id: str,
+    hub_account: HubAccount,
+    user_session_token: str,
+    db: Session
+) -> str:
+    """
+    Retorna project_id equivalente no hub
+    Se não existir, cria novo projeto na conta hub
+    """
+    
+    # Verificar se já existe mapeamento
+    mapping = db.query(ProjectMapping).filter(
+        ProjectMapping.original_project_id == original_project_id,
+        ProjectMapping.hub_account_id == hub_account.id
+    ).first()
+    
+    if mapping:
+        print(f"[HUB] Usando projeto mapeado: {mapping.hub_project_id}")
+        return mapping.hub_project_id
+    
+    # Não existe - criar novo projeto no hub
+    print(f"[HUB] Criando novo projeto no hub para: {original_project_id}")
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # 1. Buscar informações do projeto original
+        try:
+            original_response = await client.get(
+                f"https://api.lovable.dev/projects/{original_project_id}",
+                headers={"Authorization": f"Bearer {user_session_token}"}
+            )
+            
+            if original_response.status_code == 200:
+                original_data = original_response.json()
+                project_name = original_data.get("name", "Projeto")
+            else:
+                project_name = f"Projeto {original_project_id[:8]}"
+        except Exception as e:
+            print(f"[HUB] Não foi possível buscar nome do projeto: {e}")
+            project_name = f"Projeto {original_project_id[:8]}"
+        
+        # 2. Criar projeto na conta hub
+        try:
+            create_response = await client.post(
+                "https://api.lovable.dev/projects",
+                headers={
+                    "Authorization": f"Bearer {hub_account.session_token}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "name": f"[HUB] {project_name}",
+                    "template": "blank"
+                }
+            )
+            
+            if create_response.status_code not in [200, 201]:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erro ao criar projeto no hub: {create_response.text}"
+                )
+            
+            hub_project_data = create_response.json()
+            hub_project_id = hub_project_data.get("id")
+            
+            if not hub_project_id:
+                raise HTTPException(
+                    status_code=500,
+                    detail="API não retornou project_id"
+                )
+            
+            print(f"[HUB] Projeto criado no hub: {hub_project_id}")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erro ao criar projeto no hub: {str(e)}"
+            )
+        
+        # 3. Salvar mapeamento
+        mapping = ProjectMapping(
+            original_project_id=original_project_id,
+            hub_project_id=hub_project_id,
+            hub_account_id=hub_account.id,
+            project_name=project_name
+        )
+        db.add(mapping)
+        db.commit()
+        
+        print(f"[HUB] Mapeamento salvo: {original_project_id} → {hub_project_id}")
+        
+        return hub_project_id
 
 
 # =============================================================================
@@ -400,6 +547,377 @@ async def delete_license(license_id: int, admin: Admin = Depends(get_current_adm
     db.commit()
     
     return {"success": True, "message": "License deleted"}
+
+
+# =============================================================================
+# HUB PROXY ENDPOINT
+# =============================================================================
+
+@app.post("/api/proxy-hub")
+async def proxy_hub(request: ProxyHubRequest, db: Session = Depends(get_db)):
+    """
+    Proxy Hub - Envia mensagens usando conta hub
+    
+    Fluxo:
+    1. Valida licença do usuário
+    2. Seleciona conta hub ativa
+    3. Obtém/cria projeto equivalente no hub
+    4. Envia mensagem usando token da conta hub
+    5. Registra uso e economiza créditos
+    
+    Resultado: Créditos descontados da conta hub, não do usuário!
+    """
+    
+    print("\n" + "=" * 60)
+    print("[HUB PROXY] Nova requisição recebida")
+    print("=" * 60)
+    
+    # ========================================
+    # 1. VALIDAR LICENÇA
+    # ========================================
+    license = db.query(License).filter(
+        License.license_key == request.license_key
+    ).first()
+    
+    if not license:
+        raise HTTPException(status_code=404, detail="Licença não encontrada")
+    
+    if not license.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="Licença desativada pelo administrador"
+        )
+    
+    # Verificar trial expirada
+    if license.license_type == "trial":
+        if license.expires_at and datetime.utcnow() > license.expires_at:
+            raise HTTPException(
+                status_code=403,
+                detail="Licença trial expirada (15 minutos)"
+            )
+    
+    print(f"[HUB] Licença validada: {request.license_key}")
+    
+    # ========================================
+    # 2. SELECIONAR CONTA HUB
+    # ========================================
+    try:
+        hub_account = get_active_hub_account(db)
+        print(f"[HUB] Conta selecionada: {hub_account.name} ({hub_account.email})")
+    except HTTPException as e:
+        print(f"[HUB] Erro: {e.detail}")
+        raise
+    
+    # ========================================
+    # 3. OBTER/CRIAR PROJETO NO HUB
+    # ========================================
+    try:
+        hub_project_id = await get_or_create_hub_project(
+            original_project_id=request.original_project_id,
+            hub_account=hub_account,
+            user_session_token=request.user_session_token,
+            db=db
+        )
+        print(f"[HUB] Projeto hub: {hub_project_id}")
+    except HTTPException as e:
+        print(f"[HUB] Erro ao mapear projeto: {e.detail}")
+        raise
+    except Exception as e:
+        print(f"[HUB] Erro inesperado: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao mapear projeto: {str(e)}"
+        )
+    
+    # ========================================
+    # 4. ENVIAR PARA LOVABLE (USANDO TOKEN HUB)
+    # ========================================
+    lovable_url = f"https://api.lovable.dev/projects/{hub_project_id}/chat"
+    
+    payload = {
+        "message": request.message,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {hub_account.session_token}",  # ← TOKEN DO HUB!
+        "Content-Type": "application/json",
+        "User-Agent": "ChatLove-Hub/1.0"
+    }
+    
+    print(f"[HUB] Enviando para Lovable...")
+    print(f"[HUB] URL: {lovable_url}")
+    print(f"[HUB] Mensagem: {request.message[:50]}...")
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                lovable_url,
+                headers=headers,
+                json=payload
+            )
+            
+            print(f"[HUB] Resposta Lovable: {response.status_code}")
+            
+            if response.status_code == 401:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token da conta hub inválido ou expirado. Atualize no admin."
+                )
+            elif response.status_code == 403:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Sem permissão no projeto hub. Verifique configuração."
+                )
+            elif response.status_code not in [200, 202]:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Erro do Lovable: {response.text}"
+                )
+            
+            print(f"[HUB] ✓ Mensagem enviada com sucesso!")
+    
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=504,
+            detail="Timeout ao conectar com Lovable API"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao enviar para Lovable: {str(e)}"
+        )
+    
+    # ========================================
+    # 5. REGISTRAR USO
+    # ========================================
+    tokens_saved = len(request.message) / 4  # Estimativa simples
+    
+    usage = UsageLog(
+        license_id=license.id,
+        tokens_saved=float(tokens_saved),
+        message_length=len(request.message),
+        request_count=1,
+        hub_account_id=hub_account.id,           # ← NOVO
+        original_project_id=request.original_project_id,  # ← NOVO
+        hub_project_id=hub_project_id            # ← NOVO
+    )
+    db.add(usage)
+    
+    # Atualizar créditos estimados da conta hub
+    hub_account.credits_remaining -= tokens_saved
+    if hub_account.credits_remaining < 0:
+        hub_account.credits_remaining = 0
+    
+    db.commit()
+    
+    print(f"[HUB] Uso registrado: {tokens_saved:.2f} tokens")
+    print(f"[HUB] Créditos restantes (hub): {hub_account.credits_remaining:.2f}")
+    print("=" * 60 + "\n")
+    
+    # ========================================
+    # 6. RETORNAR SUCESSO
+    # ========================================
+    return {
+        "success": True,
+        "message": "Mensagem enviada via conta hub!",
+        "hub_account_name": hub_account.name,
+        "hub_account_email": hub_account.email,
+        "hub_project_id": hub_project_id,
+        "tokens_saved": float(tokens_saved),
+        "hub_credits_remaining": float(hub_account.credits_remaining)
+    }
+
+
+# =============================================================================
+# ADMIN - HUB ACCOUNTS
+# =============================================================================
+
+@app.get("/api/admin/hub-accounts")
+async def list_hub_accounts(
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Lista todas as contas hub"""
+    accounts = db.query(HubAccount).all()
+    
+    result = []
+    for account in accounts:
+        # Contar projetos mapeados
+        projects_count = db.query(ProjectMapping).filter(
+            ProjectMapping.hub_account_id == account.id
+        ).count()
+        
+        # Total de tokens usados
+        tokens_used = db.query(UsageLog).filter(
+            UsageLog.hub_account_id == account.id
+        ).with_entities(
+            func.sum(UsageLog.tokens_saved)
+        ).scalar() or 0
+        
+        result.append({
+            "id": account.id,
+            "name": account.name,
+            "email": account.email,
+            "credits_remaining": float(account.credits_remaining),
+            "is_active": account.is_active,
+            "priority": account.priority,
+            "total_requests": account.total_requests,
+            "projects_mapped": projects_count,
+            "tokens_used": float(tokens_used),
+            "last_used_at": account.last_used_at.isoformat() if account.last_used_at else None,
+            "created_at": account.created_at.isoformat(),
+            # Esconder token (segurança)
+            "session_token_preview": account.session_token[:20] + "..." if account.session_token else None
+        })
+    
+    return result
+
+
+@app.post("/api/admin/hub-accounts")
+async def create_hub_account(
+    data: HubAccountCreate,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Adiciona nova conta hub"""
+    
+    # Verificar se email já existe
+    existing = db.query(HubAccount).filter(
+        HubAccount.email == data.email
+    ).first()
+    
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Conta hub com este email já existe"
+        )
+    
+    account = HubAccount(
+        name=data.name,
+        email=data.email,
+        session_token=data.session_token,
+        credits_remaining=data.credits_remaining,
+        priority=data.priority
+    )
+    
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    
+    return {
+        "success": True,
+        "account": {
+            "id": account.id,
+            "name": account.name,
+            "email": account.email,
+            "credits_remaining": account.credits_remaining
+        }
+    }
+
+
+@app.put("/api/admin/hub-accounts/{account_id}")
+async def update_hub_account(
+    account_id: int,
+    data: HubAccountUpdate,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Atualiza conta hub"""
+    
+    account = db.query(HubAccount).filter(
+        HubAccount.id == account_id
+    ).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="Conta hub não encontrada")
+    
+    # Atualizar campos fornecidos
+    if data.name is not None:
+        account.name = data.name
+    if data.session_token is not None:
+        account.session_token = data.session_token
+    if data.credits_remaining is not None:
+        account.credits_remaining = data.credits_remaining
+    if data.is_active is not None:
+        account.is_active = data.is_active
+    if data.priority is not None:
+        account.priority = data.priority
+    
+    account.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(account)
+    
+    return {
+        "success": True,
+        "account": {
+            "id": account.id,
+            "name": account.name,
+            "is_active": account.is_active,
+            "credits_remaining": account.credits_remaining
+        }
+    }
+
+
+@app.delete("/api/admin/hub-accounts/{account_id}")
+async def delete_hub_account(
+    account_id: int,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Remove conta hub"""
+    
+    account = db.query(HubAccount).filter(
+        HubAccount.id == account_id
+    ).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="Conta hub não encontrada")
+    
+    # Deletar mapeamentos associados
+    db.query(ProjectMapping).filter(
+        ProjectMapping.hub_account_id == account_id
+    ).delete()
+    
+    # Deletar conta
+    db.delete(account)
+    db.commit()
+    
+    return {"success": True, "message": "Conta hub removida"}
+
+
+@app.get("/api/admin/hub-accounts/{account_id}/projects")
+async def list_hub_projects(
+    account_id: int,
+    admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Lista projetos mapeados de uma conta hub"""
+    
+    mappings = db.query(ProjectMapping).filter(
+        ProjectMapping.hub_account_id == account_id
+    ).all()
+    
+    result = []
+    for mapping in mappings:
+        # Contar uso deste projeto
+        usage_count = db.query(UsageLog).filter(
+            UsageLog.hub_project_id == mapping.hub_project_id
+        ).count()
+        
+        result.append({
+            "id": mapping.id,
+            "original_project_id": mapping.original_project_id,
+            "hub_project_id": mapping.hub_project_id,
+            "project_name": mapping.project_name,
+            "usage_count": usage_count,
+            "created_at": mapping.created_at.isoformat()
+        })
+    
+    return result
 
 
 # =============================================================================

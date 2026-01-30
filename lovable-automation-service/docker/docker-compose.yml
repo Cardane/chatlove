@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  lovable-automation:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: lovable-automation-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/chatlove
+      - REDIS_URL=redis://redis:6379/0
+      - LOVABLE_ACCOUNTS=${LOVABLE_ACCOUNTS:-[]}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dev-32-byte-encryption-key-here}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-key-here}
+      - MAX_MESSAGES_PER_MINUTE=${MAX_MESSAGES_PER_MINUTE:-10}
+      - MAX_CONCURRENT_SESSIONS=${MAX_CONCURRENT_SESSIONS:-3}
+      - BROWSER_HEADLESS=true
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - /dev/shm:/dev/shm  # Shared memory for browser
+    restart: unless-stopped
+    networks:
+      - lovable-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: lovable-postgres
+    environment:
+      POSTGRES_DB: chatlove
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - lovable-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: lovable-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - lovable-network
+
+  # Optional: Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: lovable-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - lovable-network
+    profiles:
+      - tools
+
+  # Optional: pgAdmin for PostgreSQL management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: lovable-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@lovable.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    restart: unless-stopped
+    networks:
+      - lovable-network
+    profiles:
+      - tools
+
+  # Optional: Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lovable-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - lovable-network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lovable-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - lovable-network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  lovable-network:
+    driver: bridge
